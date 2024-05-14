@@ -22,4 +22,5 @@ The config is located at the same place that dll is.
 ```
 
 ## Preview
-![image](https://github.com/NaathySz/AccountDupFinder/assets/97997774/b4e9a0e5-9e56-4c2f-9938-de9a66a7d739)
+![image](https://github.com/NaathySz/AccountDupFinder/assets/97997774/bd451b27-d6d3-49c8-9a96-a11849502b75)
+
