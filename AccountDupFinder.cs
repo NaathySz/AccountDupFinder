@@ -15,7 +15,7 @@ namespace AccountDupFinder
     public class AccountDupFinder : BasePlugin
     {
         public override string ModuleName => "Account Dup Finder";
-        public override string ModuleVersion => "1.0.0";
+        public override string ModuleVersion => "1.1.0";
         public override string ModuleAuthor => "Nathy";
         public override string ModuleDescription => "Help admins to find duplicate accounts";
 
@@ -138,6 +138,61 @@ namespace AccountDupFinder
             await _httpClient.PostAsync(_config.DiscordWebhookUrl, content);
         }
 
+        private async Task SendDiscordVPNNotification(string playerName, string ipAddress, string steamId64)
+        {
+            var profilePictureUrl = await GetProfilePictureAsync(steamId64, "https://steamuserimages-a.akamaihd.net/ugc/885384897182110030/F095539864AC9E94AE5236E04C8CA7C2725BCEFF/");
+
+            string accountUrl = $"https://steamcommunity.com/profiles/{steamId64}";
+
+            var embed = new
+            {
+                title = _config.VpnEmbedTitle,
+                color = _config.VpnEmbedColor,
+                fields = new[]
+                {
+                    new
+                    {
+                        name = _config.PlayerFieldName,
+                        value = playerName,
+                        inline = true
+                    },
+                    new
+                    {
+                        name = _config.IPAddressFieldName,
+                        value = ipAddress,
+                        inline = true
+                    },
+                    new
+                    {
+                        name = _config.VpnAccountFieldName,
+                        value = accountUrl,
+                        inline = false
+                    },
+                    new
+                    {
+                        name = _config.VpnNoteFieldName,
+                        value = _config.VpnNoteFieldValue,
+                        inline = false
+                    }
+                },
+                timestamp = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ"),
+                footer = new
+                {
+                    text = "AccountDupFinder, by Nathy"
+                },
+                thumbnail = new
+                {
+                    url = profilePictureUrl
+                }
+            };
+
+            var payload = new { embeds = new[] { embed } };
+            var jsonPayload = JsonConvert.SerializeObject(payload);
+            var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
+
+            await _httpClient.PostAsync(_config.DiscordWebhookUrl, content);
+        }
+
 
         [GameEventHandler]
         public HookResult OnPlayerConnectFull(EventPlayerConnectFull @event, GameEventInfo info)
@@ -160,6 +215,15 @@ namespace AccountDupFinder
 
             try
             {
+                bool isVPN = await CheckVPN(ipAddress);
+
+                if (isVPN)
+                {
+                    Console.WriteLine($"WARNING: Player {playerName} (SteamID: {steamId}, IP: {ipAddress}) is suspected of using a VPN!");
+                    await SendDiscordVPNNotification(playerName, ipAddress, steamId);
+                    return;
+                }
+
                 using (var connection = new MySqlConnection(GetConnectionString()))
                 {
                     await connection.OpenAsync();
@@ -196,6 +260,37 @@ namespace AccountDupFinder
         {
             return $"Server={_config.DatabaseHost};Port={_config.DatabasePort};Database={_config.DatabaseName};Uid={_config.DatabaseUser};Pwd={_config.DatabasePassword};";
         }
+
+        private async Task<bool> CheckVPN(string ipAddress)
+        {
+            using (HttpClient client = new HttpClient())
+            {
+                try
+                {
+                    string url = $"https://proxycheck.io/v2/{ipAddress}?vpn=2";
+                    HttpResponseMessage response = await client.GetAsync(url);
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        string responseBody = await response.Content.ReadAsStringAsync();
+
+                        dynamic? jsonResult = Newtonsoft.Json.JsonConvert.DeserializeObject(responseBody);
+
+                        if (jsonResult == null) return false;
+
+                        if (jsonResult.status == "ok" && jsonResult[ipAddress].proxy == "yes")
+                        {
+                            return true;
+                        }
+                    }
+                }
+                catch (Exception)
+                {
+                    Console.WriteLine($"Unable to fetch IP `{ipAddress}` info!");
+                }
+            }
+            return false;
+        }
     }
 
     public class PluginConfig
@@ -214,11 +309,16 @@ namespace AccountDupFinder
         public string CurrentAccountFieldName { get; set; } = "Current Account";
         public string AltAccountFieldName { get; set; } = "Alt Account";
 
+        public string VpnEmbedTitle { get; set; } = "VPN Suspected!";
+        public int VpnEmbedColor { get; set; } = 16776960;
+        public string VpnAccountFieldName { get; set; } = "Account URL";
+        public string VpnNoteFieldName { get; set; } = "Warning";
+        public string VpnNoteFieldValue { get; set; } = "This player is suspected of using a VPN!";
+
         public static PluginConfig LoadFromJson(string filePath)
         {
             string jsonData = File.ReadAllText(filePath);
             return JsonConvert.DeserializeObject<PluginConfig>(jsonData);
         }
     }
-
 }
