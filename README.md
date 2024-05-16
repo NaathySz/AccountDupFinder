@@ -47,7 +47,7 @@ In-game messages:
 
 ![image](https://github.com/NaathySz/AccountDupFinder/assets/97997774/ae56c736-ff17-4b42-9ab7-c07030c54869)
 
-![image](https://github.com/NaathySz/AccountDupFinder/assets/97997774/7ca06e85-9c8d-421b-abd8-3b2035dbf5c3)
+![image](https://github.com/NaathySz/AccountDupFinder/assets/97997774/a681fac2-bcaa-444f-bf66-7c4bf9a3774c)
 
 ## Available colors
 ```
