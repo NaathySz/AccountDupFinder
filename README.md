@@ -49,3 +49,28 @@ In-game messages:
 
 ![image](https://github.com/NaathySz/AccountDupFinder/assets/97997774/7ca06e85-9c8d-421b-abd8-3b2035dbf5c3)
 
+## Available colors
+```
+{default}
+{white}
+{darkred}
+{green}
+{lightyellow}
+{lightblue}
+{olive}
+{lime}
+{red}
+{lightpurple}
+{purple}
+{grey}
+{yellow}
+{gold}
+{silver}
+{blue}
+{darkblue}
+{bluegrey}
+{magenta}
+{lightred}
+{orange}
+```
+
