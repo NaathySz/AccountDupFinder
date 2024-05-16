@@ -1,6 +1,8 @@
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Core.Attributes.Registration;
+using CounterStrikeSharp.API.Modules.Utils;
+using CounterStrikeSharp.API.Modules.Admin;
 using Dapper;
 using MySqlConnector;
 using Newtonsoft.Json;
@@ -15,7 +17,7 @@ namespace AccountDupFinder
     public class AccountDupFinder : BasePlugin
     {
         public override string ModuleName => "Account Dup Finder";
-        public override string ModuleVersion => "1.1.0";
+        public override string ModuleVersion => "1.2.0";
         public override string ModuleAuthor => "Nathy";
         public override string ModuleDescription => "Help admins to find duplicate accounts";
 
@@ -193,6 +195,45 @@ namespace AccountDupFinder
             await _httpClient.PostAsync(_config.DiscordWebhookUrl, content);
         }
 
+        private static readonly Dictionary<string, char> ColorMap = new Dictionary<string, char>
+        {
+            { "{default}", ChatColors.Default },
+            { "{white}", ChatColors.White },
+            { "{darkred}", ChatColors.DarkRed },
+            { "{green}", ChatColors.Green },
+            { "{lightyellow}", ChatColors.LightYellow },
+            { "{lightblue}", ChatColors.LightBlue },
+            { "{olive}", ChatColors.Olive },
+            { "{lime}", ChatColors.Lime },
+            { "{red}", ChatColors.Red },
+            { "{lightpurple}", ChatColors.LightPurple },
+            { "{purple}", ChatColors.Purple },
+            { "{grey}", ChatColors.Grey },
+            { "{yellow}", ChatColors.Yellow },
+            { "{gold}", ChatColors.Gold },
+            { "{silver}", ChatColors.Silver },
+            { "{blue}", ChatColors.Blue },
+            { "{darkblue}", ChatColors.DarkBlue },
+            { "{bluegrey}", ChatColors.BlueGrey },
+            { "{magenta}", ChatColors.Magenta },
+            { "{lightred}", ChatColors.LightRed },
+            { "{orange}", ChatColors.Orange }
+        };
+
+        private string ReplaceColorPlaceholders(string message)
+        {
+
+            if (!string.IsNullOrEmpty(message) && message[0] != ' ')
+            {
+                message = " " + message;
+            }
+            
+            foreach (var colorPlaceholder in ColorMap)
+            {
+                message = message.Replace(colorPlaceholder.Key, colorPlaceholder.Value.ToString());
+            }
+            return message;
+        }
 
         [GameEventHandler]
         public HookResult OnPlayerConnectFull(EventPlayerConnectFull @event, GameEventInfo info)
@@ -215,38 +256,75 @@ namespace AccountDupFinder
 
             try
             {
-                bool isVPN = await CheckVPN(ipAddress);
-
-                if (isVPN)
+                if(_config.VPNEnabled && !_config.WhitelistIPs.Contains(ipAddress))
                 {
-                    Console.WriteLine($"WARNING: Player {playerName} (SteamID: {steamId}, IP: {ipAddress}) is suspected of using a VPN!");
-                    await SendDiscordVPNNotification(playerName, ipAddress, steamId);
-                    return;
+                    bool isVPN = await CheckVPN(ipAddress);
+
+                    if (isVPN)
+                    {
+                        Console.WriteLine($"WARNING: Player {playerName} (SteamID: {steamId}, IP: {ipAddress}) is suspected of using a VPN!");
+
+                        Server.NextFrame(() =>
+                        {
+                            var staffPlayers = Utilities.GetPlayers().Where(player => AdminManager.PlayerHasPermissions(player, "@css/generic"));
+
+                            string vpnNotificationMessage = ReplaceColorPlaceholders(_config.VpnNotificationMessage)
+                                .Replace("{playerName}", playerName)
+                                .Replace("{steamId}", steamId)
+                                .Replace("{ipAddress}", ipAddress);
+
+                            foreach (var staffPlayer in staffPlayers)
+                            {
+                                staffPlayer.PrintToChat(vpnNotificationMessage);
+                            }
+                        });
+
+                        await SendDiscordVPNNotification(playerName, ipAddress, steamId);
+                        return;
+                    }
                 }
 
-                using (var connection = new MySqlConnection(GetConnectionString()))
+                if (!_config.WhitelistSteamIDs.Contains(steamId))
                 {
-                    await connection.OpenAsync();
-
-                    Console.WriteLine("Connection opened successfully.");
-
-                    string query = "SELECT SteamID FROM player_data WHERE IPAddress = @IPAddress";
-                    var existingSteamId = await connection.ExecuteScalarAsync<string>(query, new { IPAddress = ipAddress });
-
-                    if (existingSteamId != null)
+                    using (var connection = new MySqlConnection(GetConnectionString()))
                     {
-                        if (existingSteamId != steamId)
+                        await connection.OpenAsync();
+
+                        // Console.WriteLine("Connection opened successfully.");
+
+                        string query = "SELECT SteamID FROM player_data WHERE IPAddress = @IPAddress";
+                        var existingSteamId = await connection.ExecuteScalarAsync<string>(query, new { IPAddress = ipAddress });
+
+                        if (existingSteamId != null)
                         {
-                            Console.WriteLine($"WARNING: Duplicate account detected! Player: {playerName}, Existing SteamID: {existingSteamId}, Connected SteamID: {steamId}");
-                            await SendDiscordWebhookNotification(playerName, $"https://steamcommunity.com/profiles/{steamId}", $"https://steamcommunity.com/profiles/{existingSteamId}", ipAddress, steamId);
-                        }
-                    }
-                    else
-                    {
-                        string insertQuery = "INSERT INTO player_data (SteamID, PlayerName, IPAddress) VALUES (@SteamID, @PlayerName, @IPAddress)";
-                        await connection.ExecuteAsync(insertQuery, new { SteamID = steamId, PlayerName = playerName, IPAddress = ipAddress });
+                            if (existingSteamId != steamId)
+                            {
+                                Console.WriteLine($"WARNING: Duplicate account detected! Player: {playerName}, Existing SteamID: {existingSteamId}, Connected SteamID: {steamId}");
+                                Server.NextFrame(() =>
+                                {
+                                    var staffPlayers = Utilities.GetPlayers().Where(player => AdminManager.PlayerHasPermissions(player, "@css/generic"));
 
-                        Console.WriteLine("Data inserted successfully.");
+                                    string DupNotificationMessage = ReplaceColorPlaceholders(_config.DuplicateAccountNotificationMessage)
+                                        .Replace("{playerName}", playerName)
+                                        .Replace("{steamId}", steamId)
+                                        .Replace("{ipAddress}", ipAddress)
+                                        .Replace("{DupSteamId}", existingSteamId);
+
+                                    foreach (var staffPlayer in staffPlayers)
+                                    {
+                                        staffPlayer.PrintToChat(DupNotificationMessage);
+                                    }
+                                });
+                                await SendDiscordWebhookNotification(playerName, $"https://steamcommunity.com/profiles/{steamId}", $"https://steamcommunity.com/profiles/{existingSteamId}", ipAddress, steamId);
+                            }
+                        }
+                        else
+                        {
+                            string insertQuery = "INSERT INTO player_data (SteamID, PlayerName, IPAddress) VALUES (@SteamID, @PlayerName, @IPAddress)";
+                            await connection.ExecuteAsync(insertQuery, new { SteamID = steamId, PlayerName = playerName, IPAddress = ipAddress });
+
+                            // Console.WriteLine("Data inserted successfully.");
+                        }
                     }
                 }
             }
@@ -314,6 +392,13 @@ namespace AccountDupFinder
         public string VpnAccountFieldName { get; set; } = "Account URL";
         public string VpnNoteFieldName { get; set; } = "Warning";
         public string VpnNoteFieldValue { get; set; } = "This player is suspected of using a VPN!";
+        public bool VPNEnabled { get; set; } = true;
+
+        public string VpnNotificationMessage { get; set; } = "{blue}[AccountDupFinder] {white}Suspected VPN activity by player {red}{playerName} {white}(SteamID: {red}{steamId}{white}, IP: {red}{ipAddress})";
+        public string DuplicateAccountNotificationMessage { get; set; } = "{blue}[AccountDupFinder] {white}Player {red}{playerName} {white}(SteamID: {red}{steamId}{white}, IP: {red}{ipAddress}{white}) has connected with a duplicate account! Existing SteamID: {red}{DupSteamId}";
+
+        public List<string> WhitelistIPs { get; set; } = new List<string>();
+        public List<string> WhitelistSteamIDs { get; set; } = new List<string>();
 
         public static PluginConfig LoadFromJson(string filePath)
         {
