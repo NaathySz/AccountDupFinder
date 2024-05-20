@@ -11,6 +11,7 @@ The config is located at the same place that dll is.
   "DatabaseUser": "your_username",
   "DatabasePassword": "your_password",
   "DatabaseName": "your_database_name",
+  "DatabaseTableName": "player_data",
   "DiscordWebhookUrl": "https://discord.com/api/webhooks/xxxxxxxxxxxxxxx/xxxxxxxxxxxxxxxxx",
   "EmbedTitle": "Duplicate Account Detected!",
   "EmbedColor": 16711680,
@@ -26,6 +27,7 @@ The config is located at the same place that dll is.
   "VPNEnabled": true,
   "VpnNotificationMessage": "{blue}[AccountDupFinder] {white}Suspected VPN activity by player {red}{playerName} {white}(SteamID: {red}{steamId}{white}, IP: {red}{ipAddress})",
   "DuplicateAccountNotificationMessage": "{blue}[AccountDupFinder] {white}Player {red}{playerName} {white}(SteamID: {red}{steamId}{white}, IP: {red}{ipAddress}{white}) has connected with a duplicate account! Existing SteamID: {red}{DupSteamId}",
+  "FlagToNotify": "@css/generic",
   "WhitelistIPs": [
     "192.168.0.1",
     "192.168.1.1"
