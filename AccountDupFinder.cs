@@ -17,7 +17,7 @@ namespace AccountDupFinder
     public class AccountDupFinder : BasePlugin
     {
         public override string ModuleName => "Account Dup Finder";
-        public override string ModuleVersion => "1.2.0";
+        public override string ModuleVersion => "1.3.0";
         public override string ModuleAuthor => "Nathy";
         public override string ModuleDescription => "Help admins to find duplicate accounts";
 
@@ -43,7 +43,7 @@ namespace AccountDupFinder
             {
                 connection.Open();
 
-                string createTableQuery = "CREATE TABLE IF NOT EXISTS player_data (id INT AUTO_INCREMENT PRIMARY KEY, SteamID VARCHAR(255), PlayerName VARCHAR(255), IPAddress VARCHAR(255))";
+                string createTableQuery = $"CREATE TABLE IF NOT EXISTS {_config.DatabaseTableName} (id INT AUTO_INCREMENT PRIMARY KEY, SteamID VARCHAR(255), PlayerName VARCHAR(255), IPAddress VARCHAR(255))";
 
                 using (var command = new MySqlCommand(createTableQuery, connection))
                 {
@@ -266,7 +266,7 @@ namespace AccountDupFinder
 
                         Server.NextFrame(() =>
                         {
-                            var staffPlayers = Utilities.GetPlayers().Where(player => AdminManager.PlayerHasPermissions(player, "@css/generic"));
+                            var staffPlayers = Utilities.GetPlayers().Where(player => AdminManager.PlayerHasPermissions(player, _config.FlagToNotify));
 
                             string vpnNotificationMessage = ReplaceColorPlaceholders(_config.VpnNotificationMessage)
                                 .Replace("{playerName}", playerName)
@@ -292,7 +292,7 @@ namespace AccountDupFinder
 
                         // Console.WriteLine("Connection opened successfully.");
 
-                        string query = "SELECT SteamID FROM player_data WHERE IPAddress = @IPAddress";
+                        string query = $"SELECT SteamID FROM {_config.DatabaseTableName} WHERE IPAddress = @IPAddress";
                         var existingSteamId = await connection.ExecuteScalarAsync<string>(query, new { IPAddress = ipAddress });
 
                         if (existingSteamId != null)
@@ -302,7 +302,7 @@ namespace AccountDupFinder
                                 Console.WriteLine($"WARNING: Duplicate account detected! Player: {playerName}, Existing SteamID: {existingSteamId}, Connected SteamID: {steamId}");
                                 Server.NextFrame(() =>
                                 {
-                                    var staffPlayers = Utilities.GetPlayers().Where(player => AdminManager.PlayerHasPermissions(player, "@css/generic"));
+                                    var staffPlayers = Utilities.GetPlayers().Where(player => AdminManager.PlayerHasPermissions(player, _config.FlagToNotify));
 
                                     string DupNotificationMessage = ReplaceColorPlaceholders(_config.DuplicateAccountNotificationMessage)
                                         .Replace("{playerName}", playerName)
@@ -320,7 +320,7 @@ namespace AccountDupFinder
                         }
                         else
                         {
-                            string insertQuery = "INSERT INTO player_data (SteamID, PlayerName, IPAddress) VALUES (@SteamID, @PlayerName, @IPAddress)";
+                            string insertQuery = $"INSERT INTO {_config.DatabaseTableName} (SteamID, PlayerName, IPAddress) VALUES (@SteamID, @PlayerName, @IPAddress)";
                             await connection.ExecuteAsync(insertQuery, new { SteamID = steamId, PlayerName = playerName, IPAddress = ipAddress });
 
                             // Console.WriteLine("Data inserted successfully.");
@@ -378,6 +378,7 @@ namespace AccountDupFinder
         public string DatabaseUser { get; set; }
         public string DatabasePassword { get; set; }
         public string DatabaseName { get; set; }
+        public string DatabaseTableName { get; set; } = "player_data";
         public string DiscordWebhookUrl { get; set; }
 
         public string EmbedTitle { get; set; } = "Duplicate Account Detected - Smurf Alert!";
@@ -396,6 +397,7 @@ namespace AccountDupFinder
 
         public string VpnNotificationMessage { get; set; } = "{blue}[AccountDupFinder] {white}Suspected VPN activity by player {red}{playerName} {white}(SteamID: {red}{steamId}{white}, IP: {red}{ipAddress})";
         public string DuplicateAccountNotificationMessage { get; set; } = "{blue}[AccountDupFinder] {white}Player {red}{playerName} {white}(SteamID: {red}{steamId}{white}, IP: {red}{ipAddress}{white}) has connected with a duplicate account! Existing SteamID: {red}{DupSteamId}";
+        public string FlagToNotify { get; set; } = "@css/generic";
 
         public List<string> WhitelistIPs { get; set; } = new List<string>();
         public List<string> WhitelistSteamIDs { get; set; } = new List<string>();
