@@ -14,12 +14,17 @@ using System.Threading.Tasks;
 
 namespace AccountDupFinder
 {
+    public class PlayerCacheItem
+    {
+        public DateTime LastConnectionTime { get; set; }
+    }
+
     public class AccountDupFinder : BasePlugin
     {
         public override string ModuleName => "Account Dup Finder";
-        public override string ModuleVersion => "1.3.0";
+        public override string ModuleVersion => "1.4.0";
         public override string ModuleAuthor => "Nathy";
-        public override string ModuleDescription => "Help admins to find duplicate accounts";
+        public override string ModuleDescription => "This plugin helps administrators identify duplicate accounts & vpn activity by monitoring player connections and sending notifications via Discord webhook.";
 
         private PluginConfig _config;
         private static readonly HttpClient _httpClient = new HttpClient();
@@ -250,9 +255,40 @@ namespace AccountDupFinder
             return HookResult.Continue;
         }
 
+        private readonly Dictionary<string, PlayerCacheItem> _playerCache = new Dictionary<string, PlayerCacheItem>();
+
+        private void AddPlayerToCache(string steamId)
+        {
+            _playerCache[steamId] = new PlayerCacheItem { LastConnectionTime = DateTime.UtcNow };
+        }
+
+        private bool IsPlayerInCache(string steamId)
+        {
+            return _playerCache.ContainsKey(steamId);
+        }
+
+        private void RemoveExpiredPlayersFromCache()
+        {
+            var expiredPlayers = _playerCache.Where(kv => (DateTime.UtcNow - kv.Value.LastConnectionTime).TotalMinutes >= _config.CacheTimeInMinutes).ToList();
+            foreach (var expiredPlayer in expiredPlayers)
+            {
+                _playerCache.Remove(expiredPlayer.Key);
+            }
+        }
+
         private async Task HandlePlayerConnectAsync(string playerName, string steamId, string ipAddress)
         {
             Console.WriteLine($"Player Connected: {playerName} (SteamID: {steamId}, IP: {ipAddress})");
+
+            RemoveExpiredPlayersFromCache();
+
+            if (IsPlayerInCache(steamId))
+            {
+                Console.WriteLine($"Player {playerName} (SteamID: {steamId}, IP: {ipAddress}) reconnected within {_config.CacheTimeInMinutes} minutes. Skipping webhook.");
+                return;
+            }
+
+            AddPlayerToCache(steamId);
 
             try
             {
@@ -398,6 +434,8 @@ namespace AccountDupFinder
         public string VpnNotificationMessage { get; set; } = "{blue}[AccountDupFinder] {white}Suspected VPN activity by player {red}{playerName} {white}(SteamID: {red}{steamId}{white}, IP: {red}{ipAddress})";
         public string DuplicateAccountNotificationMessage { get; set; } = "{blue}[AccountDupFinder] {white}Player {red}{playerName} {white}(SteamID: {red}{steamId}{white}, IP: {red}{ipAddress}{white}) has connected with a duplicate account! Existing SteamID: {red}{DupSteamId}";
         public string FlagToNotify { get; set; } = "@css/generic";
+
+        public int CacheTimeInMinutes { get; set; } = 5;
 
         public List<string> WhitelistIPs { get; set; } = new List<string>();
         public List<string> WhitelistSteamIDs { get; set; } = new List<string>();
