@@ -28,6 +28,7 @@ The config is located at the same place that dll is.
   "VpnNotificationMessage": "{blue}[AccountDupFinder] {white}Suspected VPN activity by player {red}{playerName} {white}(SteamID: {red}{steamId}{white}, IP: {red}{ipAddress})",
   "DuplicateAccountNotificationMessage": "{blue}[AccountDupFinder] {white}Player {red}{playerName} {white}(SteamID: {red}{steamId}{white}, IP: {red}{ipAddress}{white}) has connected with a duplicate account! Existing SteamID: {red}{DupSteamId}",
   "FlagToNotify": "@css/generic",
+  "CacheTimeInMinutes": 5,
   "WhitelistIPs": [
     "192.168.0.1",
     "192.168.1.1"
