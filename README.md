@@ -4,7 +4,7 @@ This plugin helps administrators identify duplicate accounts by monitoring playe
 ## Config
 The config is located at the same place that dll is. 
 
-```
+```json
 {
   "DatabaseHost": "localhost",
   "DatabasePort": "3306",
